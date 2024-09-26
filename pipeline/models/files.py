@@ -18,11 +18,7 @@ class File:
         file_path (Path): The path to the file.
     """
 
-    def __init__(
-        self,
-        file_path: Path,
-        with_hash: bool = True
-    ):
+    def __init__(self, file_path: Path, with_hash: bool = True):
         """
         Initialize a File object.
 

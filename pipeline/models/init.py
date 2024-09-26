@@ -13,6 +13,7 @@ from pipeline.models.networks import Network
 from pipeline.models.study import Study
 from pipeline.models.subjects import Subject
 from pipeline.models.phoenix_file import PhoenixFile
+from pipeline.models.volume_statistics import VolumeStatistics
 
 
 def flatten_list(coll: list) -> list:
@@ -45,6 +46,7 @@ def init_db(config_file: Path):
         config_file (Path): Path to the config file.
     """
     drop_queries_l: List[Union[str, List[str]]] = [
+        VolumeStatistics.drop_table_query(),
         PhoenixFile.drop_table_query(),
         File.drop_table_query(),
         Subject.drop_table_query(),
@@ -60,6 +62,7 @@ def init_db(config_file: Path):
         Subject.init_table_query(),
         File.init_table_query(),
         PhoenixFile.init_table_query(),
+        VolumeStatistics.init_table_query(),
     ]
 
     drop_queries = flatten_list(drop_queries_l)
