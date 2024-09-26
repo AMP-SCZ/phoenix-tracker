@@ -49,6 +49,30 @@ logargs = {
 logging.basicConfig(**logargs)
 
 
+def remove_existing_data(config_file: Path):
+    """
+    Remove existing data from the database. Limited to phoenix_file and files tables.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+
+    Returns:
+        None
+    """
+    logger.info("Removing existing data...")
+    queries = [
+        File.truncate_table_query(),
+        PhoenixFile.truncate_table_query(),
+    ]
+
+    db.execute_queries(
+        config_file=config_file,
+        queries=queries,
+        show_commands=False,
+        show_progress=False,
+    )
+
+
 def parse_subject_files_by_modality_root(
     subject_id: str,
     study_id: str,
@@ -250,6 +274,20 @@ if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
     logger.info(f"Using config file: {config_file}")
 
+    crawlwer_params = utils.config(
+        path=config_file,
+        section="crawler",
+    )
+    remove_files_val = crawlwer_params.get(
+        "remove_existing_data_before_import", "False"
+    )
+    remove_files = bool(remove_files_val)
+
+    logger.info(f"Remove existing data: {remove_files}")
+    if remove_files:
+        remove_existing_data(config_file=config_file)
+
+    logger.info("Importing files metadata...")
     import_phoenix_metadata(config_file=config_file)
 
     logger.info("Done.")

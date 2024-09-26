@@ -3,8 +3,8 @@
 File Model
 """
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from pipeline.helpers import db
 from pipeline.helpers.hash import compute_hash
@@ -81,6 +81,17 @@ class File:
         """
         sql_query = """
         DROP TABLE IF EXISTS files CASCADE;
+        """
+
+        return sql_query
+
+    @staticmethod
+    def truncate_table_query() -> str:
+        """
+        Return SQL query to truncate conetnes of 'files' table.
+        """
+        sql_query = """
+        TRUNCATE TABLE files;
         """
 
         return sql_query
