@@ -61,8 +61,8 @@ def remove_existing_data(config_file: Path):
     """
     logger.info("Removing existing data...")
     queries = [
-        File.truncate_table_query(),
         PhoenixFile.truncate_table_query(),
+        File.truncate_table_query(),
     ]
 
     db.execute_queries(
