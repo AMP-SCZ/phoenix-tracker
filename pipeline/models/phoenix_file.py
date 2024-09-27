@@ -79,9 +79,7 @@ class PhoenixFile:
         """
         Return the SQL query to truncate the 'phoenix_file' table.
         """
-        truncate_table_query = """
-            TRUNCATE TABLE phoenix_file;
-        """
+        truncate_table_query = "TRUNCATE TABLE phoenix_file RESTART IDENTITY CASCADE;"
         return truncate_table_query
 
     def to_sql(self):

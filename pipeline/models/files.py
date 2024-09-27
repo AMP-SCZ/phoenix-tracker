@@ -91,7 +91,7 @@ class File:
         Return SQL query to truncate conetnes of 'files' table.
         """
         sql_query = """
-        TRUNCATE TABLE files;
+        TRUNCATE TABLE files RESTART IDENTITY CASCADE;
         """
 
         return sql_query

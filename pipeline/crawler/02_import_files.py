@@ -68,7 +68,7 @@ def remove_existing_data(config_file: Path):
     db.execute_queries(
         config_file=config_file,
         queries=queries,
-        show_commands=False,
+        show_commands=True,
         show_progress=False,
     )
 
