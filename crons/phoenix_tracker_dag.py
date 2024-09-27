@@ -95,5 +95,6 @@ send_notification = BashOperator(
 info.set_downstream(import_metadata)
 import_metadata.set_downstream(import_files)
 import_files.set_downstream(compute_statistics)
+compute_statistics.set_downstream(send_notification)
 
 # End DAG construction
