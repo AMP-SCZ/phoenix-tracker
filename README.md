@@ -19,6 +19,10 @@ A simple crawler that tracks the rate of data added to the PHOENIX file system.
 2. Summarizes the data available per modality and per subject ID / Study / Research Network. (daily cron)
 3. Sends out a daily Slack message with the delta between the previous day's data and the current day's data (based on 2). (daily cron)
 
+### Example Slack Message
+
+<img src="docs/assets/sample_slack_message.png" alt="Slack Message" style="width: 750;"/>
+
 ## Intended Use
 
 This tool is intended to be used to detect when no new data is being added to the PHOENIX file system, and alert the relevant parties.
@@ -29,8 +33,3 @@ This tool is intended to be used to detect when no new data is being added to th
 - Airflow
 - PostgreSQL
 - Slack
-
-
-
-
-
