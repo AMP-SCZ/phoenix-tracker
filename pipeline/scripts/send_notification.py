@@ -22,11 +22,12 @@ try:
 except ValueError:
     pass
 
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List
-import json
 
+import humanize
 import requests
 from rich.logging import RichHandler
 
@@ -204,7 +205,9 @@ def construct_slack_blockkit_json(
             LEFT JOIN study USING (study_id)
             WHERE statistics_timestamp = '{latest_timestamp}' AND
                 modality = '{modality}' AND
-                study.network_id = '{network}'
+                study.network_id = '{network}' AND
+                is_raw is TRUE AND
+                is_protected is TRUE
             """
 
             files_sum_current = db.fetch_record(
@@ -219,7 +222,9 @@ def construct_slack_blockkit_json(
             LEFT JOIN study USING (study_id)
             WHERE statistics_timestamp = '{latest_timestamp}' AND
                 modality = '{modality}' AND
-                study.network_id = '{network}'
+                study.network_id = '{network}' AND
+                is_raw is TRUE AND
+                is_protected is TRUE
             """
 
             size_sum_current = db.fetch_record(
@@ -233,8 +238,15 @@ def construct_slack_blockkit_json(
             LEFT JOIN study USING (study_id)
             WHERE statistics_timestamp = '{previous_timestamp}' AND
                 modality = '{modality}' AND
-                study.network_id = '{network}'
+                study.network_id = '{network}' AND
+                is_raw is TRUE AND
+                is_protected is TRUE
             """
+
+            files_sum_previous = db.fetch_record(
+                config_file=config_file,
+                query=files_sum_query_previous,
+            )
 
             size_sum_query_previous = f"""
             SELECT SUM(files_size_mb) as files_size_mb
@@ -243,13 +255,11 @@ def construct_slack_blockkit_json(
             LEFT JOIN study USING (study_id)
             WHERE statistics_timestamp = '{previous_timestamp}' AND
                 modality = '{modality}' AND
-                study.network_id = '{network}'
+                study.network_id = '{network}' AND
+                is_raw is TRUE AND
+                is_protected is TRUE
             """
 
-            files_sum_previous = db.fetch_record(
-                config_file=config_file,
-                query=files_sum_query_previous,
-            )
             size_sum_previous = db.fetch_record(
                 config_file=config_file, query=size_sum_query_previous
             )
@@ -257,11 +267,19 @@ def construct_slack_blockkit_json(
             delta_files = int(files_sum_current) - int(files_sum_previous)
             delta_size = float(size_sum_current) - float(size_sum_previous)
 
+            delta_files_str = humanize.intcomma(delta_files)
+            delta_size_str = humanize.naturalsize(delta_size * 1024 * 1024, binary=True)
+
             bullet_list_elements.extend(
                 [
                     {
                         "type": "rich_text_section",
-                        "elements": [{"type": "text", "text": f"{modality} - {delta_files} files ({delta_size:.2f} MB)"}],
+                        "elements": [
+                            {
+                                "type": "text",
+                                "text": f"{modality} - {delta_files_str} files ({delta_size_str})",
+                            }
+                        ],
                     }
                 ]
             )
@@ -296,7 +314,7 @@ def construct_slack_blockkit_json(
             "elements": [
                 {
                     "type": "image",
-                    "image_url": "https://cdn-icons-png.flaticon.com/512/4539/4539472.png",
+                    "image_url": "https://cdn-icons-png.flaticon.com/128/4539/4539472.png",
                     "alt_text": "notifications warning icon",
                 },
                 {
@@ -307,6 +325,20 @@ def construct_slack_blockkit_json(
         }
         blocks.append(issue_warning)
 
+    info_block = {
+        "type": "context",
+        "elements": [
+            {
+                "type": "image",
+                "image_url": "https://cdn-icons-png.flaticon.com/128/8692/8692942.png",
+                "alt_text": "cute cat",
+            },
+            {"type": "mrkdwn", "text": "Only includes *PROTECTED* and *raw* files"},
+        ],
+    }
+
+    blocks.append(info_block)
+
     payload_body = {
         "blocks": blocks,
     }
@@ -314,12 +346,14 @@ def construct_slack_blockkit_json(
     return payload_body
 
 
-def send_slack_nitification(config_file: Path) -> None:
+def send_slack_notification(config_file: Path, dry_run: bool = False) -> None:
     """
     Sends a Slack notification about the daily volume of data transferred.
 
     Args:
         config_file (Path): The path to the configuration file.
+        dry_run (bool): Whether to run in dry-run mode.
+            Does not send the notification if True.
 
     Returns:
         None
@@ -340,6 +374,11 @@ def send_slack_nitification(config_file: Path) -> None:
         latest_timestamp=latest_timestamp,
         previous_timestamp=previous_timestamp,
     )
+
+    if dry_run:
+        logger.info("Dry-run mode enabled. Skipping Slack notification.")
+        logger.debug(f"Payload: {json.dumps(slack_payload, indent=4)}")
+        return
 
     response = requests.post(
         slack_webhook_url,
@@ -367,6 +406,6 @@ if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
     logger.info(f"Using config file: {config_file}")
 
-    send_slack_nitification(config_file=config_file)
+    send_slack_notification(config_file=config_file)
 
     logger.info("Done.")
