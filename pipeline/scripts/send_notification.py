@@ -119,7 +119,7 @@ def get_most_recent_statistics_timestamp(config_file: Path) -> datetime:
 
 
 def get_earlier_statistics_timestamp(
-    config_file: Path, threshold_date: datetime
+    config_file: Path, threshold_date: datetime, offset: int = 0
 ) -> datetime:
     """
     Returns the last timestamp before the threshold date.
@@ -137,7 +137,7 @@ def get_earlier_statistics_timestamp(
         FROM volume_statistics
         WHERE statistics_timestamp < '{threshold_date}'
         ORDER BY statistics_timestamp DESC
-        LIMIT 1
+        LIMIT 1 OFFSET {offset}
     """
 
     previous_update = db.fetch_record(
@@ -198,6 +198,15 @@ def construct_slack_blockkit_json(
 
         bullet_list_elements: List[Dict[str, Any]] = []
         for modality in modalities:
+            is_protected: bool = True
+            is_raw: bool = True
+            qualifier: str = ""
+
+            if modality == "interviews":
+                is_protected = False
+                is_raw = False
+                qualifier = "- (GENERAL, processed)"
+
             files_sum_query_current = f"""
             SELECT SUM(files_count) as number_of_files
             FROM volume_statistics
@@ -206,8 +215,8 @@ def construct_slack_blockkit_json(
             WHERE statistics_timestamp = '{latest_timestamp}' AND
                 modality = '{modality}' AND
                 study.network_id = '{network}' AND
-                is_raw is TRUE AND
-                is_protected is TRUE
+                is_raw is {is_raw} AND
+                is_protected is {is_protected}
             """
 
             files_sum_current = db.fetch_record(
@@ -223,8 +232,8 @@ def construct_slack_blockkit_json(
             WHERE statistics_timestamp = '{latest_timestamp}' AND
                 modality = '{modality}' AND
                 study.network_id = '{network}' AND
-                is_raw is TRUE AND
-                is_protected is TRUE
+                is_raw is {is_raw} AND
+                is_protected is {is_protected}
             """
 
             size_sum_current = db.fetch_record(
@@ -239,8 +248,8 @@ def construct_slack_blockkit_json(
             WHERE statistics_timestamp = '{previous_timestamp}' AND
                 modality = '{modality}' AND
                 study.network_id = '{network}' AND
-                is_raw is TRUE AND
-                is_protected is TRUE
+                is_raw is {is_raw} AND
+                is_protected is {is_protected}
             """
 
             files_sum_previous = db.fetch_record(
@@ -256,8 +265,8 @@ def construct_slack_blockkit_json(
             WHERE statistics_timestamp = '{previous_timestamp}' AND
                 modality = '{modality}' AND
                 study.network_id = '{network}' AND
-                is_raw is TRUE AND
-                is_protected is TRUE
+                is_raw is {is_raw} AND
+                is_protected is {is_protected}
             """
 
             size_sum_previous = db.fetch_record(
@@ -277,7 +286,7 @@ def construct_slack_blockkit_json(
                         "elements": [
                             {
                                 "type": "text",
-                                "text": f"{modality} - {delta_files_str} files ({delta_size_str})",
+                                "text": f"{modality} - {delta_files_str} files ({delta_size_str}) {qualifier}",
                             }
                         ],
                     }
@@ -331,7 +340,7 @@ def construct_slack_blockkit_json(
             {
                 "type": "image",
                 "image_url": "https://cdn-icons-png.flaticon.com/128/8692/8692942.png",
-                "alt_text": "cute cat",
+                "alt_text": "information icon",
             },
             {"type": "mrkdwn", "text": "Only includes *PROTECTED* and *raw* files"},
         ],
