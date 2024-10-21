@@ -191,6 +191,7 @@ def plot_modality_count(
     data_df = db.execute_sql(
         config_file=config_file,
         query=data_query,
+        db="postgresql",
     )
 
     if network_id is not None:
@@ -320,10 +321,7 @@ def plot_modality_size(
         order by statistics_timestamp ASC
         """
 
-    data_df = db.execute_sql(
-        config_file=config_file,
-        query=data_query,
-    )
+    data_df = db.execute_sql(config_file=config_file, query=data_query, db="postgresql")
 
     if network_id is not None:
         network_df = data_df[data_df["network_id"] == network_id]
@@ -467,6 +465,9 @@ def plot_modality_wrapper(ack, respond, command):
                 network_id=network,
                 num_days=num_days,
             )
+        else:
+            respond("Usage: /plot [modality] [count/size] [network] [num_days]")
+            return
     except ValueError as e:
         logger.error(e)
         respond(f"Error: {e}")
@@ -509,6 +510,195 @@ def handle_app_mention(body):
     text = body["event"]["text"]
 
     logger.debug(f"Received app mention from {user_id} in {channel_id}: {text}")
+
+
+def get_consented_count(
+    config_file: Path,
+    cohort: str,
+    network_id: str,
+) -> int:
+    """
+    Returns the consented count for the given cohort and network.
+
+    Args:
+    - config_file (Path): Path to the config file
+    - cohort (str): Cohort
+    - network (str): Network
+
+    Returns:
+    - recruitment_count (int): Recruitment count
+    """
+    query = f"""
+    SELECT COUNT(*) AS count
+    FROM
+        (SELECT recruitment_status.*,
+                site_id,
+                site_name,
+                site_country,
+                network_id,
+                site_country_code,
+                cohort
+        FROM recruitment_status
+        INNER JOIN subjects ON recruitment_status.subject_id = subjects.id
+        INNER JOIN site ON subjects.site_id = site.id
+        INNER JOIN filters ON recruitment_status .subject_id = filters.subject) AS virtual_table
+    WHERE network_id IN ('{network_id}')
+        AND cohort IN ('{cohort}');
+    """
+
+    consented_count = db.fetch_record(
+        config_file=config_file,
+        query=query,
+        db="formsdb",
+    )
+
+    return consented_count
+
+
+def get_recruitment_count(
+    config_file: Path,
+    cohort: str,
+    network_id: str,
+) -> int:
+    """
+    Returns the recruitment count for the given cohort and network.
+
+    Args:
+    - config_file (Path): Path to the config file
+    - cohort (str): Cohort
+    - network (str): Network
+
+    Returns:
+    - recruitment_count (int): Recruitment count
+    """
+    query = f"""
+    SELECT COUNT(*) AS count
+    FROM
+        (SELECT recruitment_status.*,
+                site_id,
+                site_name,
+                site_country,
+                network_id,
+                site_country_code,
+                cohort
+        FROM recruitment_status
+        INNER JOIN subjects ON recruitment_status.subject_id = subjects.id
+        INNER JOIN site ON subjects.site_id = site.id
+        INNER JOIN filters ON recruitment_status .subject_id = filters.subject) AS virtual_table
+    WHERE network_id IN ('{network_id}')
+        AND cohort IN ('{cohort}')
+        AND recruitment_status = 'recruited';
+    """
+
+    recruitment_count = db.fetch_record(
+        config_file=config_file,
+        query=query,
+        db="formsdb",
+    )
+
+    return recruitment_count
+
+
+@app.command("/recruitment")
+def post_recruitment_numbers(ack, respond, command):
+    """
+    Slash command wrapper for plotting the data flow for the given modality.
+
+    Usage:
+    - /recruitment
+
+    Args:
+    - ack: Acknowledge the request
+    - respond: Respond to the request
+    - command: Command details
+
+    Returns:
+    - None
+    """
+    ack()
+
+    user_id = command["user_id"]
+
+    blocks = []
+
+    # Date Format: August 20, 2024
+    header = {
+        "type": "section",
+        "text": {
+            "text": f"AMPSCZ Recruitment Status as of {datetime.now().date().strftime('%B %d, %Y')}",
+            "type": "mrkdwn",
+        },
+    }
+
+    divider = {"type": "divider"}
+
+    blocks.append(header)
+    blocks.append(divider)
+
+    networks = ["ProNET", "PRESCIENT"]
+    cohorts = ["CHR", "HC"]
+
+    for network in networks:
+        network_elemnts = []
+        network_header = {
+            "type": "rich_text_section",
+            "elements": [{"type": "text", "text": network}],
+        }
+        network_elemnts.append(network_header)
+
+        for cohort in cohorts:
+            list_header = {
+                "type": "rich_text_list",
+                "style": "bullet",
+                "indent": 0,
+                "border": 0,
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [{"type": "text", "text": cohort}],
+                    }
+                ],
+            }
+            consented_count = get_consented_count(
+                config_file=config_file, cohort=cohort, network_id=network
+            )
+            recruitment_count = get_recruitment_count(
+                config_file=config_file, cohort=cohort, network_id=network
+            )
+
+            info_block = {
+                "type": "rich_text_list",
+                "style": "bullet",
+                "indent": 1,
+                "border": 0,
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [
+                            {"type": "text", "text": f"Consented: {consented_count}"}
+                        ],
+                    },
+                    {
+                        "type": "rich_text_section",
+                        "elements": [
+                            {"type": "text", "text": f"Recruited: {recruitment_count}"}
+                        ],
+                    },
+                ],
+            }
+
+            network_elemnts.append(list_header)
+            network_elemnts.append(info_block)
+
+        blocks.append({"type": "rich_text", "elements": network_elemnts})
+        blocks.append(divider)
+
+    logger.debug(f"{user_id} - {command['text']}")
+
+    payload = {
+        "blocks": blocks,
+    }
+    respond(payload)
 
 
 if __name__ == "__main__":
