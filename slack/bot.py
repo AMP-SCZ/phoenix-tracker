@@ -34,6 +34,7 @@ except ValueError:
 import logging
 from datetime import datetime
 from typing import Optional
+import socket
 
 import matplotlib
 import pandas as pd
@@ -116,7 +117,7 @@ def ping_function(ack, respond, command) -> None:
         None
     """
     ack()
-    response = f"pong: {command['text']}"
+    response = f"pong[@{socket.gethostname()}]: {command['text']}"
     logger.debug(f'{command["user_id"]} - {command["text"]} - {response}')
     respond(response)
 
@@ -531,17 +532,17 @@ def get_consented_count(
     query = f"""
     SELECT COUNT(*) AS count
     FROM
-        (SELECT recruitment_status.*,
+        (SELECT forms_derived.recruitment_status.*,
                 site_id,
                 site_name,
                 site_country,
                 network_id,
                 site_country_code,
                 cohort
-        FROM recruitment_status
+        FROM forms_derived.recruitment_status
         INNER JOIN subjects ON recruitment_status.subject_id = subjects.id
         INNER JOIN site ON subjects.site_id = site.id
-        INNER JOIN filters ON recruitment_status .subject_id = filters.subject) AS virtual_table
+        INNER JOIN forms_derived.filters ON forms_derived.recruitment_status.subject_id = forms_derived.filters.subject) AS virtual_table
     WHERE network_id IN ('{network_id}')
         AND cohort IN ('{cohort}');
     """
@@ -574,17 +575,17 @@ def get_recruitment_count(
     query = f"""
     SELECT COUNT(*) AS count
     FROM
-        (SELECT recruitment_status.*,
+        (SELECT forms_derived.recruitment_status.*,
                 site_id,
                 site_name,
                 site_country,
                 network_id,
                 site_country_code,
                 cohort
-        FROM recruitment_status
+        FROM forms_derived.recruitment_status
         INNER JOIN subjects ON recruitment_status.subject_id = subjects.id
         INNER JOIN site ON subjects.site_id = site.id
-        INNER JOIN filters ON recruitment_status .subject_id = filters.subject) AS virtual_table
+        INNER JOIN forms_derived.filters ON forms_derived.recruitment_status.subject_id = forms_derived.filters.subject) AS virtual_table
     WHERE network_id IN ('{network_id}')
         AND cohort IN ('{cohort}')
         AND recruitment_status = 'recruited';
