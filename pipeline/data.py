@@ -255,3 +255,40 @@ def get_subject_modality_files(
     db_df = db.execute_sql(config_file=config_file, query=query)
 
     return db_df
+
+
+def get_subject_modality_files_by_metadata(
+    subject_id: str,
+    modality: str,
+    metadata_key: str,
+    metadata_value: str,
+    config_file: Path,
+) -> pd.DataFrame:
+    """
+    Gets the files for a given subject and modality.
+
+    Args:
+        subject_id (str): The subject ID.
+        modality (str): The modality.
+        metadata (str): The metadata.
+        config_file (Path): The path to the configuration file.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the files.
+    """
+
+    study_id = get_subject_study_id(subject_id=subject_id, config_file=config_file)
+
+    query = f"""
+        SELECT *
+        FROM phoenix_file
+        LEFT JOIN files USING (file_path)
+        WHERE subject_id = '{subject_id}'
+            AND study_id = '{study_id}'
+            AND modality = '{modality}'
+            AND metadata->>'{metadata_key}' LIKE '%%{metadata_value}%%';
+    """
+
+    db_df = db.execute_sql(config_file=config_file, query=query)
+
+    return db_df

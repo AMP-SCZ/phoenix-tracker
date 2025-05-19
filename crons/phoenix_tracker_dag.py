@@ -8,15 +8,15 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
-CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+CONDA_ENV_PATH = "/home/pnl/miniforge3/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/PHShome/dm1447/dev/phoenix-tracker"
+REPO_ROOT = "/home/pnl/dev/phoenix-tracker"
 
 # Define variables
 default_args = {
-    "owner": "admin",
+    "owner": "pnl",
     "depends_on_past": False,
-    "start_date": datetime(2024, 9, 23),
+    "start_date": datetime(2025, 4, 21),
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 3,

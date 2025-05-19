@@ -25,7 +25,7 @@ except ValueError:
 import logging
 import multiprocessing
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 from rich.logging import RichHandler
 
@@ -73,6 +73,50 @@ def remove_existing_data(config_file: Path):
     )
 
 
+def get_file_metadata(
+    file_path: Path,
+    is_protected: bool,
+    is_raw: bool,
+    modality: str,
+) -> Dict[str, Any]:
+    """
+    Get the metadata of a file.
+
+    Args:
+        file_path (Path): The path to the file.
+        is_protected (bool): Whether the data is protected.
+        is_raw (bool): Whether the data is raw.
+        modality (str): The modality of the file.
+
+    Returns:
+        Dict[str, Any]: The metadata of the file.
+    """
+    file_metadata: Dict[str, Any] = {}
+
+    if not (is_protected and is_raw):
+        return file_metadata 
+
+    file_name = file_path.name
+
+    if not file_name.endswith(".json"):
+        return file_metadata
+
+    if modality == "surveys":
+        if file_name.endswith("UPENN_nda.json"):
+            file_metadata["redcap_instance"] = "UPENN"
+        elif file_name.endswith("Pronet.json"):
+            file_metadata["redcap_instance"] = "MGB-Pronet"
+        elif file_name.endswith("Prescient.json"):
+            file_metadata["redcap_instance"] = "MGB-Prescient"
+    elif modality == "phone":
+        if "_sensor_" in file_name:
+            file_metadata["mindlamp_type"] = "sensor"
+        elif "_activity_" in file_name:
+            file_metadata["mindlamp_type"] = "activity"
+
+    return file_metadata
+
+
 def parse_subject_files_by_modality_root(
     subject_id: str,
     study_id: str,
@@ -98,6 +142,12 @@ def parse_subject_files_by_modality_root(
 
     for path in modality_root.rglob("*"):
         if path.is_file():
+            file_metadata = get_file_metadata(
+                file_path=path,
+                is_protected=is_protected,
+                is_raw=is_raw,
+                modality=modality_root.name,
+            )
             file = File(
                 file_path=path,
                 with_hash=False,
@@ -110,7 +160,7 @@ def parse_subject_files_by_modality_root(
                 is_raw=is_raw,
                 modality=modality_root.name,
                 extracted_timestamp=datetime.now(),
-                metadata={},
+                metadata=file_metadata,
             )
             subject_files.append((file, phoenix_file))
 

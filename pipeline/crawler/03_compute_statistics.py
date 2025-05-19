@@ -94,6 +94,47 @@ def process_subject(subject_id: str, config_file: str) -> List[Dict[str, Any]]:
 
                 results.append(result)
 
+                if is_protected and is_raw:
+                    sub_types: List[Tuple[str, str]] = []
+                    if modality == "phone":
+                        sub_types = [
+                            ("mindlamp_type", "sensor"),
+                            ("mindlamp_type", "activity"),
+                        ]
+                    elif modality == "surveys":
+                        sub_types = [
+                            ("redcap_instance", "UPENN"),
+                            ("redcap_instance", "MGB"),
+                        ]
+
+                    for sub_type in sub_types:
+                        sub_type_name, sub_type_value = sub_type
+
+                        filtered_df = data.get_subject_modality_files_by_metadata(
+                            subject_id=subject_id,
+                            modality=modality,
+                            metadata_key=sub_type_name,
+                            metadata_value=sub_type_value,
+                            config_file=config_file,
+                        )
+
+                        if filtered_df.empty:
+                            continue
+
+                        files_count = len(filtered_df)
+                        size_sum = filtered_df["file_size_mb"].sum()
+
+                        result = {
+                            "subject_id": subject_id,
+                            "study_id": study_id,
+                            "modality": f"{modality}_{sub_type_value}",
+                            "is_protected": is_protected,
+                            "is_raw": is_raw,
+                            "files_count": files_count,
+                            "files_size_mb": size_sum,
+                        }
+                        results.append(result)
+
     return results
 
 
@@ -141,6 +182,8 @@ def compute_statistics(
     logger.info("Constructing SQL queries...")
 
     timestamp = datetime.now()
+    logger.info(f"Timestamp: {timestamp}")
+
     queries: List[str] = []
 
     for result in results:

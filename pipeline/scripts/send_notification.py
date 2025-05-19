@@ -149,6 +149,135 @@ def get_earlier_statistics_timestamp(
     return previous_update
 
 
+def get_delta_files_count(
+    config_file: Path,
+    latest_timestamp: datetime,
+    previous_timestamp: datetime,
+    network: str,
+    modality: str,
+    is_protected: bool,
+    is_raw: bool,
+) -> int:
+    """
+    Computes the delta files count for a given network and modality.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        latest_timestamp (datetime): The latest timestamp.
+        previous_timestamp (datetime): The previous timestamp.
+        network (str): The network ID.
+        modality (str): The modality.
+        is_protected (bool): Whether the data is protected.
+        is_raw (bool): Whether the data is raw.
+
+    Returns:
+        int: The delta files count.
+    """
+
+    files_sum_query_current = f"""
+    SELECT SUM(files_count) as number_of_files
+    FROM volume_statistics
+    LEFT JOIN subjects USING (subject_id, study_id)
+    LEFT JOIN study USING (study_id)
+    WHERE statistics_timestamp = '{latest_timestamp}' AND
+        modality = '{modality}' AND
+        study.network_id = '{network}' AND
+        is_raw is {is_raw} AND
+        is_protected is {is_protected}
+    """
+
+    files_sum_current = db.fetch_record(
+        config_file=config_file,
+        query=files_sum_query_current,
+    )
+
+    files_sum_query_previous = f"""
+    SELECT SUM(files_count) as number_of_files
+    FROM volume_statistics
+    LEFT JOIN subjects USING (subject_id, study_id)
+    LEFT JOIN study USING (study_id)
+    WHERE statistics_timestamp = '{previous_timestamp}' AND
+        modality = '{modality}' AND
+        study.network_id = '{network}' AND
+        is_raw is {is_raw} AND
+        is_protected is {is_protected}
+    """
+
+    files_sum_previous = db.fetch_record(
+        config_file=config_file,
+        query=files_sum_query_previous,
+    )
+
+    try:
+        delta_files = int(files_sum_current) - int(files_sum_previous)
+    except ValueError:
+        return int(files_sum_current)
+    return delta_files
+
+
+def get_delta_files_size(
+    config_file: Path,
+    latest_timestamp: datetime,
+    previous_timestamp: datetime,
+    network: str,
+    modality: str,
+    is_protected: bool,
+    is_raw: bool,
+) -> float:
+    """
+    Computes the delta files size for a given network and modality.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        latest_timestamp (datetime): The latest timestamp.
+        previous_timestamp (datetime): The previous timestamp.
+        network (str): The network ID.
+        modality (str): The modality.
+        is_protected (bool): Whether the data is protected.
+        is_raw (bool): Whether the data is raw.
+
+    Returns:
+        float: The delta files size in MB.
+    """
+    size_sum_query_current = f"""
+    SELECT SUM(files_size_mb) as files_size_mb
+    FROM volume_statistics
+    LEFT JOIN subjects USING (subject_id, study_id)
+    LEFT JOIN study USING (study_id)
+    WHERE statistics_timestamp = '{latest_timestamp}' AND
+        modality = '{modality}' AND
+        study.network_id = '{network}' AND
+        is_raw is {is_raw} AND
+        is_protected is {is_protected}
+    """
+
+    size_sum_current = db.fetch_record(
+        config_file=config_file, query=size_sum_query_current
+    )
+
+    size_sum_query_previous = f"""
+    SELECT SUM(files_size_mb) as files_size_mb
+    FROM volume_statistics
+    LEFT JOIN subjects USING (subject_id, study_id)
+    LEFT JOIN study USING (study_id)
+    WHERE statistics_timestamp = '{previous_timestamp}' AND
+        modality = '{modality}' AND
+        study.network_id = '{network}' AND
+        is_raw is {is_raw} AND
+        is_protected is {is_protected}
+    """
+
+    size_sum_previous = db.fetch_record(
+        config_file=config_file, query=size_sum_query_previous
+    )
+
+    try:
+        delta_size = float(size_sum_current) - float(size_sum_previous)
+    except ValueError:
+        return float(size_sum_current)
+    return delta_size
+
+
 def construct_slack_blockkit_json(
     config_file: Path, latest_timestamp: datetime, previous_timestamp: datetime
 ) -> Dict[str, Any]:
@@ -196,8 +325,14 @@ def construct_slack_blockkit_json(
             },
         ]
 
-        bullet_list_elements: List[Dict[str, Any]] = []
         for modality in modalities:
+            bullet_list_block = {
+                "type": "rich_text_list",
+                "indent": 0,
+                "style": "bullet",
+            }
+            bullet_list_elements: List[Dict[str, Any]] = []
+
             is_protected: bool = True
             is_raw: bool = True
             qualifier: str = ""
@@ -207,74 +342,25 @@ def construct_slack_blockkit_json(
                 is_raw = False
                 qualifier = "- (GENERAL, processed)"
 
-            files_sum_query_current = f"""
-            SELECT SUM(files_count) as number_of_files
-            FROM volume_statistics
-            LEFT JOIN subjects USING (subject_id, study_id)
-            LEFT JOIN study USING (study_id)
-            WHERE statistics_timestamp = '{latest_timestamp}' AND
-                modality = '{modality}' AND
-                study.network_id = '{network}' AND
-                is_raw is {is_raw} AND
-                is_protected is {is_protected}
-            """
-
-            files_sum_current = db.fetch_record(
+            delta_files = get_delta_files_count(
                 config_file=config_file,
-                query=files_sum_query_current,
+                latest_timestamp=latest_timestamp,
+                previous_timestamp=previous_timestamp,
+                network=network,
+                modality=modality,
+                is_protected=is_protected,
+                is_raw=is_raw,
             )
 
-            size_sum_query_current = f"""
-            SELECT SUM(files_size_mb) as files_size_mb
-            FROM volume_statistics
-            LEFT JOIN subjects USING (subject_id, study_id)
-            LEFT JOIN study USING (study_id)
-            WHERE statistics_timestamp = '{latest_timestamp}' AND
-                modality = '{modality}' AND
-                study.network_id = '{network}' AND
-                is_raw is {is_raw} AND
-                is_protected is {is_protected}
-            """
-
-            size_sum_current = db.fetch_record(
-                config_file=config_file, query=size_sum_query_current
-            )
-
-            files_sum_query_previous = f"""
-            SELECT SUM(files_count) as number_of_files
-            FROM volume_statistics
-            LEFT JOIN subjects USING (subject_id, study_id)
-            LEFT JOIN study USING (study_id)
-            WHERE statistics_timestamp = '{previous_timestamp}' AND
-                modality = '{modality}' AND
-                study.network_id = '{network}' AND
-                is_raw is {is_raw} AND
-                is_protected is {is_protected}
-            """
-
-            files_sum_previous = db.fetch_record(
+            delta_size = get_delta_files_size(
                 config_file=config_file,
-                query=files_sum_query_previous,
+                latest_timestamp=latest_timestamp,
+                previous_timestamp=previous_timestamp,
+                network=network,
+                modality=modality,
+                is_protected=is_protected,
+                is_raw=is_raw,
             )
-
-            size_sum_query_previous = f"""
-            SELECT SUM(files_size_mb) as files_size_mb
-            FROM volume_statistics
-            LEFT JOIN subjects USING (subject_id, study_id)
-            LEFT JOIN study USING (study_id)
-            WHERE statistics_timestamp = '{previous_timestamp}' AND
-                modality = '{modality}' AND
-                study.network_id = '{network}' AND
-                is_raw is {is_raw} AND
-                is_protected is {is_protected}
-            """
-
-            size_sum_previous = db.fetch_record(
-                config_file=config_file, query=size_sum_query_previous
-            )
-
-            delta_files = int(files_sum_current) - int(files_sum_previous)
-            delta_size = float(size_sum_current) - float(size_sum_previous)
 
             delta_files_str = humanize.intcomma(delta_files)
             delta_size_str = humanize.naturalsize(delta_size * 1024 * 1024, binary=True)
@@ -293,17 +379,74 @@ def construct_slack_blockkit_json(
                 ]
             )
 
+            bullet_list_block["elements"] = bullet_list_elements
+            # Add bullet list to network_section_elements's elements
+            network_section_elements.append(bullet_list_block)
+
             if delta_size == 0 or delta_files == 0:
                 issue_detected = True
 
-        bullet_list_block = {
-            "type": "rich_text_list",
-            "style": "bullet",
-            "elements": bullet_list_elements,
-        }
+            modality_sub_types: List[str] = []
+            if modality == "phone":
+                modality_sub_types = [
+                    "sensor",
+                    "activity",
+                ]
+            elif modality == "surveys":
+                modality_sub_types = [
+                    "UPENN",
+                    "MGB",
+                ]
 
-        # Add bullet list to network_section_elements's elements
-        network_section_elements.append(bullet_list_block)
+            for sub_type in modality_sub_types:
+                bullet_list_block = {
+                    "type": "rich_text_list",
+                    "indent": 1,
+                    "style": "bullet",
+                }
+                bullet_list_elements: List[Dict[str, Any]] = []
+                delta_files = get_delta_files_count(
+                    config_file=config_file,
+                    latest_timestamp=latest_timestamp,
+                    previous_timestamp=previous_timestamp,
+                    network=network,
+                    modality=f"{modality}_{sub_type}",
+                    is_protected=is_protected,
+                    is_raw=is_raw,
+                )
+
+                delta_size = get_delta_files_size(
+                    config_file=config_file,
+                    latest_timestamp=latest_timestamp,
+                    previous_timestamp=previous_timestamp,
+                    network=network,
+                    modality=f"{modality}_{sub_type}",
+                    is_protected=is_protected,
+                    is_raw=is_raw,
+                )
+
+                delta_files_str = humanize.intcomma(delta_files)
+                delta_size_str = humanize.naturalsize(
+                    delta_size * 1024 * 1024, binary=True
+                )
+
+                bullet_list_elements.extend(
+                    [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [
+                                {
+                                    "type": "text",
+                                    "text": f"{sub_type} - {delta_files_str} files ({delta_size_str}) {qualifier}",
+                                }
+                            ],
+                        }
+                    ]
+                )
+
+                bullet_list_block["elements"] = bullet_list_elements
+                # Add bullet list to network_section_elements's elements
+                network_section_elements.append(bullet_list_block)
 
         network_section = {
             "type": "rich_text",
@@ -415,6 +558,6 @@ if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
     logger.info(f"Using config file: {config_file}")
 
-    send_slack_notification(config_file=config_file)
+    send_slack_notification(config_file=config_file, dry_run=False)
 
     logger.info("Done.")
