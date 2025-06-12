@@ -48,7 +48,7 @@ def handle_nan(query: str) -> str:
     return query
 
 
-def santize_string(string: str) -> str:
+def sanitize_string(string: str) -> str:
     """
     Sanitizes a string by escaping single quotes.
 
@@ -73,7 +73,7 @@ def sanitize_json(json_dict: dict) -> str:
     """
     for key, value in json_dict.items():
         if isinstance(value, str):
-            json_dict[key] = santize_string(value)
+            json_dict[key] = sanitize_string(value)
 
     json_str = json.dumps(json_dict, default=str)
 
@@ -201,8 +201,8 @@ def execute_queries(
         else:
             raise e
     finally:
-        if conn is not None:
-            conn.close()
+        if conn is not None:  # type: ignore
+            conn.close()  # type: ignore
 
     return output
 

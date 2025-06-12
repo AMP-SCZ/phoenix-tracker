@@ -28,7 +28,8 @@ dag = DAG(
     "ampscz_phoenix_tracker",
     default_args=default_args,
     description="DAG for AMPSCZ phoenix metadata tracker",
-    schedule="@daily",
+    schedule="0 10 * * *",  # Every day at 10:00 AM UTC -> 6:00 AM ET
+    max_active_runs=1,
 )
 
 info = BashOperator(
@@ -47,32 +48,13 @@ echo "$(date) - Uptime: $(uptime)"''',
     cwd=REPO_ROOT,
 )
 
-# Import study metadata
-import_metadata = BashOperator(
-    task_id="import_metadata",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/pipeline/crawler/01_import_study_metadata.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-)
-
-# Import files metadata
-import_files = BashOperator(
-    task_id="import_files",
-    bash_command=PYTHON_PATH + " " + REPO_ROOT + "/pipeline/crawler/02_import_files.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-)
-
 # Compute statistics
 compute_statistics = BashOperator(
     task_id="compute_statistics",
     bash_command=PYTHON_PATH
     + " "
     + REPO_ROOT
-    + "/pipeline/crawler/03_compute_statistics.py",
+    + "/pipeline/scripts/populate_phoenix_metadata.py",
     dag=dag,
     cwd=REPO_ROOT,
 )
@@ -92,9 +74,7 @@ send_notification = BashOperator(
 
 # Start DAG construction
 
-info.set_downstream(import_metadata)
-import_metadata.set_downstream(import_files)
-import_files.set_downstream(compute_statistics)
+info.set_downstream(compute_statistics)
 compute_statistics.set_downstream(send_notification)
 
 # End DAG construction
