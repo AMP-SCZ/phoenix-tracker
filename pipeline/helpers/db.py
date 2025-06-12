@@ -7,7 +7,7 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, Literal, Optional
+from typing import Callable, Dict, Literal, Optional, List
 
 import pandas as pd
 import psycopg2
@@ -205,6 +205,50 @@ def execute_queries(
             conn.close()  # type: ignore
 
     return output
+
+def execute_maintenance_queries(
+    config_file: Path,
+    queries: List[str],
+    db: str = "postgresql",
+    show_commands: bool = True,
+    on_failure: Optional[Callable] = None,
+) -> None:
+    """
+    Executes maintenance SQL queries (e.g. VACUUM, ANALYZE, CLUSTER) in autocommit mode.
+
+    Args:
+        config_file (Path): Path to your config file for DB connection.
+        queries (List[str]): List of SQL statements to execute.
+        db (str): Section/key in the config to use (default: "postgresql").
+        show_commands (bool): If True, prints each command before execution.
+        on_failure (Callable): Optional callback to invoke on error.
+    """
+    conn = None
+    try:
+        # 1) load credentials however you already do
+        credentials = get_db_credentials(config_file=config_file, db=db)
+
+        # 2) connect and switch to autocommit
+        conn: psycopg2.extensions.connection = psycopg2.connect(**credentials)  # type: ignore
+        conn.autocommit = True
+        cur = conn.cursor()
+
+        # 3) execute each maintenance query
+        for sql in queries:
+            if show_commands:
+                print(f">>> {sql}")
+            cur.execute(sql)
+
+        cur.close()
+    except Exception as e:
+        print("Error running maintenance queries:", e)
+        if on_failure:
+            on_failure()
+        else:
+            raise
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_db_connection(

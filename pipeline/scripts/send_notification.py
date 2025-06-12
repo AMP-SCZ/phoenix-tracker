@@ -698,6 +698,6 @@ if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
     logger.info(f"Using config file: {config_file}")
 
-    send_slack_notification(config_file=config_file, dry_run=True)
+    send_slack_notification(config_file=config_file, dry_run=False)
 
     logger.info("Done.")

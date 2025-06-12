@@ -220,12 +220,6 @@ if __name__ == "__main__":
 
         queries.insert(0, delete_query)
 
-        post_queries = [
-            "VACUUM ANALYZE phoenix.file_metadata",
-        ]
-
-        queries.extend(post_queries)
-
         logger.info(f"Executing {len(queries)} queries for scan ID: {scan_id}")
         db.execute_queries(
             config_file=config_file,
@@ -233,5 +227,17 @@ if __name__ == "__main__":
             show_commands=False,
             show_progress=True,
         )
+
+    post_queries = [
+        "VACUUM ANALYZE phoenix.file_metadata",
+        "VACUUM ANALYZE filesystem.file_changes",
+    ]
+
+    db.execute_maintenance_queries(
+        config_file=config_file,
+        queries=post_queries,
+        show_commands=False,
+    )
+
 
     logger.info("All scan IDs processed successfully.")
