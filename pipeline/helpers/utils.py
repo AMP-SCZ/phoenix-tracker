@@ -288,9 +288,7 @@ def timeout_max(seconds: int):
     return decorator
 
 
-def silence_logs(
-    noisy_modules: List[str], target_level: int = logging.INFO
-) -> None:
+def silence_logs(noisy_modules: List[str], target_level: int = logging.INFO) -> None:
     """
     Silences logs from specified modules.
 
@@ -304,3 +302,25 @@ def silence_logs(
     for module in noisy_modules:
         logger.debug(f"Setting log level for {module} to {target_level}")
         logging.getLogger(module).setLevel(target_level)
+
+
+def explode_col(df: pd.DataFrame, col: str = "form_data") -> pd.DataFrame:
+    """
+    Explodes the `col` column of the DataFrame.
+
+    `col` column contains a JSON object.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the `col`.
+        col (str, optional): The name of the column to explode. Defaults to "form_data".
+
+    Returns:
+        pd.DataFrame: DataFrame with the `col` column exploded.
+    """
+    df.reset_index(drop=True, inplace=True)
+    df = pd.concat(
+        [df.drop(col, axis=1), pd.json_normalize(df[col])],  # type: ignore
+        axis=1,
+    )
+
+    return df

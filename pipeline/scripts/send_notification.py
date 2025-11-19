@@ -488,7 +488,7 @@ def construct_slack_blockkit_json(
         elif modality == "surveys":
             modality_sub_types = [
                 ("UPENN", ("redcap_instance", "UPENN")),
-                ("MGB", ("redcap_instance", "MGB-Prescient")),
+                ("MGB", ("redcap_instance", f"MGB-{network}")),
             ]
 
         for sub_type in modality_sub_types:
