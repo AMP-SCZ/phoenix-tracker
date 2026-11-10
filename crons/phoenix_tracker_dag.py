@@ -5,18 +5,17 @@ Airflow DAG for PHOENIX Tracker
 
 from datetime import datetime, timedelta
 
-from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.sdk import DAG
+from airflow.providers.standard.operators.bash import BashOperator
 
-CONDA_ENV_PATH = "/home/pnl/miniforge3/envs/jupyter/bin"
-PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/home/pnl/dev/phoenix-tracker"
+PYTHON_PATH = "uv run python"
+REPO_ROOT = "/home/pnl/scratch/dev/phoenix-tracker"
 
 # Define variables
 default_args = {
     "owner": "pnl",
     "depends_on_past": False,
-    "start_date": datetime(2025, 4, 21),
+    "start_date": datetime(2025, 11, 19),
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 3,
@@ -30,6 +29,7 @@ dag = DAG(
     description="DAG for AMPSCZ phoenix metadata tracker",
     schedule="0 10 * * *",  # Every day at 10:00 AM UTC -> 6:00 AM ET
     max_active_runs=1,
+    tags=["phoenix-tracker", "ampscz", "slack"],
 )
 
 info = BashOperator(
